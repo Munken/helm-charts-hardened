@@ -264,7 +264,12 @@ name (the cluster name key from spire-controller-manager.standalone-
 clusters).
 */}}
 {{- define "spire-controller-manager.standalone-cluster-fullname" -}}
-{{- printf "%s-%s" (include "spire-controller-manager.standalone-fullname" .root) .name }}
+{{- $fullname := printf "%s-%s" (include "spire-controller-manager.standalone-fullname" .root) .name -}}
+{{- if gt (len $fullname) 63 -}}
+{{- printf "%s-%s" ($fullname | trunc 54 | trimSuffix "-") ($fullname | sha256sum | trunc 8) -}}
+{{- else -}}
+{{- $fullname -}}
+{{- end -}}
 {{- end }}
 
 {{- define "spire-controller-manager.standalone-cluster-serviceAccountName" -}}

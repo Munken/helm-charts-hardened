@@ -141,6 +141,32 @@ data:
 {{- $fullname := include "spire-controller-manager.standalone-instance-fullname" . }}
 {{- $serviceAccountName := include "spire-controller-manager.standalone-instance-serviceAccountName" . }}
 {{- $configSuffix := include "spire-controller-manager.standalone-instance-config-suffix" . }}
+{{- $defaults := $root.Values.controllerManager }}
+{{- $settings := dict }}
+{{- $resources := $root.Values.controllerManager.standalone.resources }}
+{{- $securityContext := $root.Values.controllerManager.standalone.securityContext }}
+{{- if not $isDefault }}
+{{- $defaults = $root.Values.externalControllerManagers.defaults }}
+{{- if hasKey $root.Values.externalControllerManagers.clusters .name }}
+{{- $settings = index $root.Values.externalControllerManagers.clusters .name }}
+{{- end }}
+{{- $resources = $defaults.resources }}
+{{- if hasKey $settings "resources" }}
+{{- $resources = $settings.resources }}
+{{- end }}
+{{- $securityContext = $defaults.securityContext }}
+{{- if hasKey $settings "securityContext" }}
+{{- $securityContext = mergeOverwrite (deepCopy $defaults.securityContext) $settings.securityContext }}
+{{- end }}
+{{- end }}
+{{- $extraEnv := $defaults.extraEnv }}
+{{- if hasKey $settings "extraEnv" }}
+{{- $extraEnv = $settings.extraEnv }}
+{{- end }}
+{{- $expandEnv := $defaults.expandEnv }}
+{{- if hasKey $settings "expandEnv" }}
+{{- $expandEnv = $settings.expandEnv }}
+{{- end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -285,7 +311,7 @@ spec:
               readOnly: true
         - name: spire-controller-manager
           securityContext:
-            {{- include "spire-lib.securitycontext-extended" (dict "root" $root "securityContext" $root.Values.controllerManager.standalone.securityContext) | nindent 12 }}
+            {{- include "spire-lib.securitycontext-extended" (dict "root" $root "securityContext" $securityContext) | nindent 12 }}
           image: {{ template "spire-lib.image" (dict "appVersion" $root.Chart.AppVersion "image" $root.Values.controllerManager.image "global" $root.Values.global) }}
           imagePullPolicy: {{ $root.Values.controllerManager.image.pullPolicy }}
           args:
@@ -293,14 +319,14 @@ spec:
             - --kubeconfig=/kubeconfigs/{{ .kubeConfigName }}
             {{- end }}
             - --config=controller-manager-config{{ $configSuffix }}.yaml
-            {{- if $root.Values.controllerManager.expandEnv }}
+            {{- if $expandEnv }}
             - --expand-env
             {{- end }}
           env:
             - name: ENABLE_WEBHOOKS
               value: {{ $webhooksEnabled | toString | quote }}
-            {{- if gt (len $root.Values.controllerManager.extraEnv) 0 }}
-            {{- $root.Values.controllerManager.extraEnv | toYaml | nindent 12 }}
+            {{- if gt (len $extraEnv) 0 }}
+            {{- $extraEnv | toYaml | nindent 12 }}
             {{- end }}
           ports:
             {{- if $webhooksEnabled }}
@@ -325,7 +351,7 @@ spec:
               port: hp-cm
             {{- toYaml $root.Values.controllerManager.readinessProbe | nindent 12 }}
           resources:
-            {{- toYaml $root.Values.controllerManager.standalone.resources | nindent 12 }}
+            {{- toYaml $resources | nindent 12 }}
           volumeMounts:
             - name: spire-agent-socket
               mountPath: {{ dir $agentSocketPath }}

@@ -61,13 +61,6 @@ helm test --namespace "${ns}" spire
 kubectl apply --namespace default -f "${SCRIPTPATH}/client-pod.yaml"
 kubectl wait --for=condition=Ready pod/standalone-cm-client --namespace default --timeout 5m
 
-count=30
-until kubectl logs standalone-cm-client --namespace default | grep -q 'SPIFFE ID:'; do
-  count=$((count - 1))
-  if [ "${count}" -le 0 ]; then
-    echo "timed out waiting for standalone-cm-client to receive an SVID" >&2
-kubectl logs standalone-cm-client --namespace default
-
 # Render-only smoke test: validate that combining standalone
 # deploymentMode with a jwtSVIDExec-based kubeConfigs entry produces the
 # expected artifacts (extra bootstrap workload entry, jwt-svid-exec init
@@ -84,6 +77,14 @@ echo "${rendered}" | grep -q '"hint": "jwt-svid-exec"' \
   || { echo "expected extra bootstrap entry to carry the deterministic hint" >&2; exit 1; }
 echo "${rendered}" | grep -q 'init-jwt-svid-exec' \
   || { echo "expected the standalone Deployment to stage the exec plugin binary" >&2; exit 1; }
+
+count=30
+until kubectl logs standalone-cm-client --namespace default | grep -q 'SPIFFE ID:'; do
+  count=$((count - 1))
+  if [ "${count}" -le 0 ]; then
+    echo "timed out waiting for standalone-cm-client to receive an SVID" >&2
+kubectl logs standalone-cm-client --namespace default
+
     exit 1
   fi
   sleep 2

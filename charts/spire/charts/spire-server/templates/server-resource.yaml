@@ -379,7 +379,7 @@ spec:
                         if [ "$rc" -eq 0 ]; then
                           exit 0
                         fi
-                        if [ -z "$(echo "$out" | grep 'code: ' | grep -v 'AlreadyExists')" ]; then
+                        if echo "$out" | grep -q 'AlreadyExists'; then
                           exit 0
                         fi
                       fi

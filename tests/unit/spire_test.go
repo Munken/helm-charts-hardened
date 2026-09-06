@@ -1183,6 +1183,69 @@ spire-server:
 			Expect(strings.Count(cmConfig, "spireServerSocketPath:")).Should(Equal(0))
 		})
 
+		It("applies external controller-manager defaults and cluster overrides to standalone instances", func() {
+			objs, err := ValueStringRender(chart, `
+spire-server:
+  controllerManager:
+    enabled: true
+    deploymentMode: standalone
+  externalControllerManagers:
+    enabled: true
+    defaults:
+      expandEnv: true
+      extraEnv:
+        - name: DEFAULT_ENV
+          value: default
+      resources:
+        requests:
+          cpu: 123m
+      securityContext:
+        readOnlyRootFilesystem: true
+    clusters:
+      clustera:
+        extraEnv:
+          - name: CLUSTER_ENV
+            value: clustera
+        resources:
+          requests:
+            cpu: 456m
+        securityContext:
+          allowPrivilegeEscalation: false
+      clusterb: {}
+  kubeConfigs:
+    clustera:
+      kubeConfig: test-kubeconfig-a
+    clusterb:
+      kubeConfig: test-kubeconfig-b
+`)
+			Expect(err).Should(Succeed())
+			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).Should(ContainSubstring("CLUSTER_ENV"))
+			Expect(standaloneManifest).Should(ContainSubstring("cpu: 456m"))
+			Expect(standaloneManifest).Should(ContainSubstring("allowPrivilegeEscalation: false"))
+			Expect(standaloneManifest).Should(ContainSubstring("DEFAULT_ENV"))
+			Expect(standaloneManifest).Should(ContainSubstring("cpu: 123m"))
+		})
+
+		It("hashes long external standalone resource names", func() {
+			longName := strings.Repeat("a", 50)
+			objs, err := ValueStringRender(chart, `
+spire-server:
+  controllerManager:
+    enabled: true
+    deploymentMode: standalone
+  externalControllerManagers:
+    enabled: true
+  kubeConfigs:
+    `+longName+`:
+      kubeConfig: test-kubeconfig
+`)
+			Expect(err).Should(Succeed())
+			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).ShouldNot(ContainSubstring("name: spire-controller-manager-standalone-" + longName))
+			Expect(standaloneManifest).Should(MatchRegexp(`name: spire-controller-manager-standalone-.+-[a-f0-9]{8}`))
+		})
+
 		It("supports jwtSVIDExec kubeConfigs entries in standalone mode by switching the exec plugin to the standalone Pod's own agent Workload API", func() {
 			standaloneJWTExec := standalone + `
   externalControllerManagers:
