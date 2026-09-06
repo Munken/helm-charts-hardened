@@ -174,8 +174,8 @@ data:
     agent {
       data_dir = "/var/lib/spire-agent-cm"
       log_level = {{ $root.Values.controllerManager.standalone.agent.logLevel | quote }}
-      server_address = {{ printf "%s.%s.svc.cluster.local" (include "spire-server.fullname" $root) (include "spire-server.namespace" $root) | quote }}
-      server_port = "443"
+      server_address = {{ printf "%s.%s.svc.%s" (include "spire-server.fullname" $root) (include "spire-server.namespace" $root) (include "spire-lib.cluster-domain" $root) | quote }}
+      server_port = {{ $root.Values.service.port | quote }}
       socket_path = {{ $agentSocketPath | quote }}
       trust_bundle_format = {{ $root.Values.bundlePublisher.k8sConfigMap.format | quote }}
       trust_bundle_path = {{ printf "/run/spire/bundle/bundle.%s" (include "spire-lib.trust-bundle-ext" (dict "trustBundleFormat" $root.Values.bundlePublisher.k8sConfigMap.format)) | quote }}
@@ -334,6 +334,11 @@ spec:
               mountPath: /controller-manager-config{{ $configSuffix }}.yaml
               subPath: controller-manager-config{{ $configSuffix }}.yaml
               readOnly: true
+            {{- if ne $root.Values.controllerManager.staticManifestMode "off" }}
+            - name: controller-manager-static-config
+              mountPath: /manifests
+              readOnly: true
+            {{- end }}
             {{- if not $isDefault }}
             - name: kubeconfigs
               mountPath: /kubeconfigs/{{ .kubeConfigName }}
@@ -369,6 +374,11 @@ spec:
         - name: controller-manager-config
           configMap:
             name: {{ include "spire-controller-manager.fullname" $root }}
+        {{- if ne $root.Values.controllerManager.staticManifestMode "off" }}
+        - name: controller-manager-static-config
+          configMap:
+            name: {{ include "spire-controller-manager.fullname" $root }}-static
+        {{- end }}
         {{- if not $isDefault }}
         - name: kubeconfigs
           secret:

@@ -5,6 +5,10 @@
 {{- $configSum2 := (include (print $.Template.BasePath "/secret.yaml") . | sha256sum) }}
 {{- $configSum3 := (include (print $.Template.BasePath "/controller-manager-configmap.yaml") . | sha256sum) }}
 {{- $configSumTornjak := (include (print $.Template.BasePath "/tornjak-config.yaml") . | sha256sum) }}
+{{- $standaloneBootstrapSum := "" }}
+{{- if and (eq (.Values.controllerManager.enabled | toString) "true") (eq .Values.controllerManager.deploymentMode "standalone") }}
+{{-   $standaloneBootstrapSum = include (print $.Template.BasePath "/controller-manager-standalone.yaml") . | sha256sum }}
+{{- end }}
 {{- $fullname := include "spire-server.fullname" . }}
 {{- if hasKey .Values "ca_subject" }}
 {{-   fail "ca_subject was renamed to caSubject. Please update your config." }}
@@ -123,6 +127,9 @@ spec:
         checksum/config2: {{ $configSum2 }}
         checksum/config3: {{ $configSum3 }}
         checksum/configTornjak: {{ $configSumTornjak }}
+        {{- if $standaloneBootstrapSum }}
+        checksum/controller-manager-standalone-bootstrap: {{ $standaloneBootstrapSum }}
+        {{- end }}
         {{- with .Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}

@@ -64,7 +64,7 @@ roleRef:
   name: {{ include "spire-lib.bundle-configmap" . }}
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
-{{- if or .Values.nodeAttestor.k8sPSAT.enabled .Values.dynamicRegistration.enabled }}
+{{- if or .Values.nodeAttestor.k8sPSAT.enabled .Values.dynamicRegistration.enabled (and (eq (.Values.controllerManager.enabled | toString) "true") (eq .Values.controllerManager.deploymentMode "standalone")) }}
 ---
 # ClusterRole to allow spire-server node attestor to query Token Review API
 kind: ClusterRole

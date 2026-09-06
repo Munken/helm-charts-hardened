@@ -1025,6 +1025,20 @@ spire-server:
 			Expect(serverConfig).Should(ContainSubstring("\"use_pod_uid_for_agent_id\": true"))
 		})
 
+		It("enables k8s_psat and TokenReview RBAC when the regular k8s_psat attestor is disabled", func() {
+			objs, err := ValueStringRender(chart, standalone+`
+  nodeAttestor:
+    k8sPSAT:
+      enabled: false
+`)
+			Expect(err).Should(Succeed())
+			serverConfig := objs["spire/charts/spire-server/templates/configmap.yaml"]
+			Expect(serverConfig).Should(ContainSubstring(`"k8s_psat": {`))
+			Expect(serverConfig).Should(ContainSubstring(`"use_pod_uid_for_agent_id": true`))
+			roles := objs["spire/charts/spire-server/templates/roles.yaml"]
+			Expect(roles).Should(ContainSubstring("resources: [tokenreviews]"))
+		})
+
 		It("applies the bootstrap entries via a postStart hook on the spire-server container", func() {
 			objs, err := ValueStringRender(chart, standalone)
 			Expect(err).Should(Succeed())
@@ -1033,6 +1047,7 @@ spire-server:
 			Expect(serverResource).Should(ContainSubstring("entry"))
 			Expect(serverResource).Should(ContainSubstring("create"))
 			Expect(serverResource).Should(ContainSubstring("-data=/controller-manager-standalone-bootstrap/entries.json"))
+			Expect(serverResource).Should(ContainSubstring("checksum/controller-manager-standalone-bootstrap:"))
 		})
 
 		It("renders a single ControllerManagerConfig that dials the SPIRE Server over TCP", func() {
@@ -1084,8 +1099,8 @@ global:
 			Expect(svc).Should(ContainSubstring("app.kubernetes.io/name: spire-controller-manager-standalone"))
 		})
 
-		It("does not restrict staticManifestMode", func() {
-			_, err := ValueStringRender(chart, `
+		It("mounts static manifests in the standalone Deployment", func() {
+			objs, err := ValueStringRender(chart, `
 spire-server:
   controllerManager:
     enabled: true
@@ -1093,6 +1108,27 @@ spire-server:
     staticManifestMode: internal
 `)
 			Expect(err).Should(Succeed())
+			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).Should(ContainSubstring("name: controller-manager-static-config"))
+			Expect(standaloneManifest).Should(ContainSubstring("mountPath: /manifests"))
+		})
+
+		It("uses the configured cluster domain and service port for the standalone agent", func() {
+			objs, err := ValueStringRender(chart, `
+global:
+  k8s:
+    clusterDomain: corp.internal
+spire-server:
+  controllerManager:
+    enabled: true
+    deploymentMode: standalone
+  service:
+    port: 8443
+`)
+			Expect(err).Should(Succeed())
+			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).Should(ContainSubstring("corp.internal"))
+			Expect(standaloneManifest).Should(ContainSubstring(`server_port = "8443"`))
 		})
 
 		It("fails on an unsupported deploymentMode", func() {

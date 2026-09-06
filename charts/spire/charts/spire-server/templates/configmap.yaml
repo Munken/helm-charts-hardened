@@ -199,10 +199,11 @@ plugins:
 {{- end }}
 {{- end }}
 
-  {{- if or .Values.nodeAttestor.k8sPSAT.enabled .Values.nodeAttestor.externalK8sPSAT.enabled .Values.nodeAttestor.joinToken.enabled .Values.nodeAttestor.httpChallenge.enabled .Values.nodeAttestor.tpmDirect.enabled .Values.nodeAttestor.awsIID.enabled .Values.nodeAttestor.gcpIIT.enabled .Values.nodeAttestor.x509POP.enabled .Values.spireIdentityExchange.enabled }}
+  {{- $standaloneControllerManager := and (eq (.Values.controllerManager.enabled | toString) "true") (eq .Values.controllerManager.deploymentMode "standalone") }}
+  {{- if or .Values.nodeAttestor.k8sPSAT.enabled .Values.nodeAttestor.externalK8sPSAT.enabled .Values.nodeAttestor.joinToken.enabled .Values.nodeAttestor.httpChallenge.enabled .Values.nodeAttestor.tpmDirect.enabled .Values.nodeAttestor.awsIID.enabled .Values.nodeAttestor.gcpIIT.enabled .Values.nodeAttestor.x509POP.enabled .Values.spireIdentityExchange.enabled $standaloneControllerManager }}
   NodeAttestor:
   {{- $clusters := default .Values.kubeConfigs .Values.nodeAttestor.externalK8sPSAT.clusters }}
-  {{- if or (eq (.Values.nodeAttestor.k8sPSAT.enabled | toString) "true") (and (eq (.Values.nodeAttestor.externalK8sPSAT.enabled | toString) "true") (gt (len $clusters) 0)) }}
+  {{- if or (eq (.Values.nodeAttestor.k8sPSAT.enabled | toString) "true") (and (eq (.Values.nodeAttestor.externalK8sPSAT.enabled | toString) "true") (gt (len $clusters) 0)) $standaloneControllerManager }}
     k8s_psat:
       plugin_data:
         clusters:
