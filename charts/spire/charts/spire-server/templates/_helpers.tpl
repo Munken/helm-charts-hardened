@@ -180,7 +180,12 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "spire-controller-manager.standalone-fullname" -}}
-{{ include "spire-controller-manager.fullname" . }}-standalone
+{{- $fullname := printf "%s-standalone" (include "spire-controller-manager.fullname" .) -}}
+{{- if gt (len $fullname) 63 -}}
+{{- printf "%s-%s" ($fullname | trunc 54 | trimSuffix "-") ($fullname | sha256sum | trunc 8) -}}
+{{- else -}}
+{{- $fullname -}}
+{{- end -}}
 {{- end }}
 
 {{- define "spire-controller-manager.standalone-serviceAccountName" -}}

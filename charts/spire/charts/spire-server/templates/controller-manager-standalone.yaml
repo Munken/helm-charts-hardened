@@ -132,9 +132,10 @@ data:
 {{- $root := .root }}
 {{- $isDefault := eq .name "" }}
 {{- $webhooksEnabled := false }}
-{{- if $isDefault }}
+{{- if and $isDefault (eq $root.Values.controllerManager.staticManifestMode "off") }}
 {{- $webhooksEnabled = $root.Values.controllerManager.validatingWebhookConfiguration.enabled }}
 {{- end }}
+{{- $metricsEnabled := or (dig "telemetry" "prometheus" "enabled" $root.Values.telemetry.prometheus.enabled $root.Values.global) (and (dig "spire" "recommendations" "enabled" false $root.Values.global) (dig "spire" "recommendations" "prometheus" true $root.Values.global)) }}
 {{- $jwtExecNeeded := include "spire-controller-manager.standalone-instance-jwt-exec-needed" . | eq "true" }}
 {{- $agentSocketPath := include "spire-controller-manager.standalone-agent-socket-path" $root }}
 {{- $attestorCluster := include "spire-controller-manager.standalone-instance-attestor-cluster-name" . }}
@@ -336,7 +337,7 @@ spec:
             {{- end }}
             - containerPort: 8083
               name: hp-cm
-            {{- if or (dig "telemetry" "prometheus" "enabled" $root.Values.telemetry.prometheus.enabled $root.Values.global) (and (dig "spire" "recommendations" "enabled" false $root.Values.global) (dig "spire" "recommendations" "prometheus" true $root.Values.global)) }}
+            {{- if $metricsEnabled }}
             - containerPort: 8082
               name: pm-cm
             {{- end }}
@@ -416,7 +417,7 @@ spec:
         - name: plugins
           emptyDir: {}
         {{- end }}
-{{- if (dig "telemetry" "prometheus" "podMonitor" "enabled" $root.Values.telemetry.prometheus.podMonitor.enabled $root.Values.global) }}
+{{- if and $metricsEnabled (dig "telemetry" "prometheus" "podMonitor" "enabled" $root.Values.telemetry.prometheus.podMonitor.enabled $root.Values.global) }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -425,6 +426,12 @@ metadata:
   namespace: {{ include "spire-server.podMonitor.namespace" $root }}
   labels:
     {{- include "spire-controller-manager.standalone-instance-labels" . | nindent 4 }}
+    {{- if ne (len (dig "telemetry" "prometheus" "podMonitor" "labels" (dict) $root.Values.global)) 0 }}
+    {{- $root.Values.global.telemetry.prometheus.podMonitor.labels | toYaml | nindent 4 }}
+    {{- end }}
+    {{- with $root.Values.telemetry.prometheus.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     matchLabels:

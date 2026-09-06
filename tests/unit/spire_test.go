@@ -1111,6 +1111,23 @@ spire-server:
 			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
 			Expect(standaloneManifest).Should(ContainSubstring("name: controller-manager-static-config"))
 			Expect(standaloneManifest).Should(ContainSubstring("mountPath: /manifests"))
+			Expect(standaloneManifest).Should(ContainSubstring(`value: "false"`))
+			Expect(standaloneManifest).ShouldNot(ContainSubstring("containerPort: 9443"))
+			config := objs["spire/charts/spire-server/templates/controller-manager-configmap.yaml"]
+			Expect(config).ShouldNot(ContainSubstring("validatingWebhookConfigurationName:"))
+		})
+
+		It("hashes long default standalone resource names", func() {
+			objs, err := ValueStringRender(chart, `
+spire-server:
+  fullnameOverride: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  controllerManager:
+    enabled: true
+    deploymentMode: standalone
+`)
+			Expect(err).Should(Succeed())
+			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).Should(MatchRegexp(`name: a{54}-[a-f0-9]{8}`))
 		})
 
 		It("uses the configured cluster domain and service port for the standalone agent", func() {
@@ -1244,6 +1261,56 @@ spire-server:
 			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
 			Expect(standaloneManifest).ShouldNot(ContainSubstring("name: spire-controller-manager-standalone-" + longName))
 			Expect(standaloneManifest).Should(MatchRegexp(`name: spire-controller-manager-standalone-.+-[a-f0-9]{8}`))
+		})
+
+		It("renders a standalone PodMonitor only when its metrics port is enabled", func() {
+			objs, err := ValueStringRender(chart, standalone+`
+  telemetry:
+    prometheus:
+      podMonitor:
+        enabled: true
+`)
+			Expect(err).Should(Succeed())
+			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).ShouldNot(ContainSubstring("kind: PodMonitor"))
+
+			objs, err = ValueStringRender(chart, standalone+`
+  telemetry:
+    prometheus:
+      enabled: true
+      podMonitor:
+        enabled: true
+`)
+			Expect(err).Should(Succeed())
+			standaloneManifest = objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).Should(ContainSubstring("name: pm-cm"))
+			Expect(standaloneManifest).Should(ContainSubstring("kind: PodMonitor"))
+		})
+
+		It("applies PodMonitor discovery labels to standalone PodMonitors", func() {
+			objs, err := ValueStringRender(chart, `
+global:
+  telemetry:
+    prometheus:
+      podMonitor:
+        labels:
+          global-label: global-value
+spire-server:
+  controllerManager:
+    enabled: true
+    deploymentMode: standalone
+  telemetry:
+    prometheus:
+      enabled: true
+      podMonitor:
+        enabled: true
+        labels:
+          local-label: local-value
+`)
+			Expect(err).Should(Succeed())
+			standaloneManifest := objs["spire/charts/spire-server/templates/controller-manager-standalone.yaml"]
+			Expect(standaloneManifest).Should(ContainSubstring("global-label: global-value"))
+			Expect(standaloneManifest).Should(ContainSubstring("local-label: local-value"))
 		})
 
 		It("supports jwtSVIDExec kubeConfigs entries in standalone mode by switching the exec plugin to the standalone Pod's own agent Workload API", func() {

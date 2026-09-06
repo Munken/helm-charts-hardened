@@ -18,7 +18,7 @@ data:
 {{- $clusterName := include "spire-lib.cluster-name" . }}
 {{- if eq .Values.controllerManager.deploymentMode "standalone" }}
   controller-manager-config.yaml: |
-    {{- include "spire-controller-manager.config" (dict "Values" .Values "Chart" .Chart "Release" .Release "startPort" $startPort "suffix" "" "settings" (dict) "defaults" .Values.controllerManager "webhookEnabled" .Values.controllerManager.validatingWebhookConfiguration.enabled "clusterName" $clusterName "standalone" true) | nindent 4 }}
+    {{- include "spire-controller-manager.config" (dict "Values" .Values "Chart" .Chart "Release" .Release "startPort" $startPort "suffix" "" "settings" (dict) "defaults" .Values.controllerManager "webhookEnabled" (and (eq .Values.controllerManager.staticManifestMode "off") .Values.controllerManager.validatingWebhookConfiguration.enabled) "clusterName" $clusterName "standalone" true) | nindent 4 }}
 {{- else }}
   controller-manager-config.yaml: |
     {{- include "spire-controller-manager.config" (dict "Values" .Values "Chart" .Chart "Release" .Release "startPort" $startPort "suffix" "" "settings" (dict) "defaults" .Values.controllerManager "webhookEnabled" .Values.controllerManager.validatingWebhookConfiguration.enabled "clusterName" $clusterName "standalone" false) | nindent 4 }}
